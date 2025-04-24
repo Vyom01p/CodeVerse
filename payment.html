@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Store Ltd - Payment</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background-color: white;
+      border-bottom: 1px solid #ddd;
+    }
+    header img {
+      height: 30px;
+    }
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 2rem;
+      gap: 2rem;
+    }
+    .payment, .summary {
+      background-color: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      flex: 1 1 300px;
+      max-width: 400px;
+    }
+    h3 {
+      margin-top: 0;
+    }
+    .methods {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .methods button {
+      flex: 1 1 45%;
+      padding: 0.5rem;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .methods img {
+      max-height: 25px;
+    }
+    .payment-details {
+      margin-top: 1rem;
+      display: none;
+    }
+    .payment-details input {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .payment-details input.invalid {
+      border-color: red;
+      background-color: #ffe6e6;
+    }
+    .error-message {
+      color: red;
+      font-size: 0.8rem;
+      margin-bottom: 10px;
+      display: none;
+    }
+    .summary .item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .summary .total {
+      font-weight: bold;
+      font-size: 1.2em;
+      margin-top: 1rem;
+    }
+    .btn-pay {
+      width: 100%;
+      background: green;
+      color: white;
+      border: none;
+      padding: 1rem;
+      border-radius: 5px;
+      font-size: 1em;
+      margin-top: 1rem;
+      cursor: pointer;
+    }
+    .cancel {
+      display: block;
+      margin-top: 10px;
+      text-align: center;
+      color: #444;
+      font-size: 0.9em;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .confirmation {
+      display: none;
+      text-align: center;
+      padding: 1rem;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.8em;
+      padding: 2rem;
+      color: #888;
+    }
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong><p class="m-0 fw-bold" style="font-size: 25px;">Code<span style="color: #026fe0;">Verse</span></p></strong>
+    <img src="Group 191.png" alt="Logo">
+  </header>
+
+  <div class="container">
+    <div class="payment">
+      <h3>How would you like to pay?</h3>
+      <div class="methods">
+        <button onclick="showDetails('card')"><img src="https://upload.wikimedia.org/wikipedia/commons/4/41/Visa_Logo.png" alt="Visa"></button>
+        <button onclick="showDetails('card')"><img src="https://upload.wikimedia.org/wikipedia/commons/0/04/Mastercard-logo.png" alt="Mastercard"></button>
+        <button onclick="showDetails('paypal')"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal"></button>
+        <button onclick="showDetails('upi')"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/512px-UPI-Logo-vector.svg.png" alt="UPI"></button>
+      </div>
+      <div class="payment-details" id="payment-details"></div>
+    </div>
+
+    <div class="summary">
+      <h3>Order Summary</h3>
+      <div class="item">Course <span>₹0</span></div>
+      <div class="item">Shipping <span>Free</span></div>
+      <div class="item">Taxes <span>₹0</span></div>
+      <div class="total">Total <span>₹0</span></div>
+      <button class="btn-pay" onclick="confirmPayment()">Continue to secure payment</button>
+      <a class="cancel" onclick="goBack()">Cancel payment</a>
+
+      <div class="confirmation" id="confirmationBox">
+        <h4>Payment Successful</h4>
+        <p>Thank you for your purchase!</p>
+        <div id="receiptDetails" style="text-align:left; margin-top:1rem;">
+          <p><strong>Course:</strong> <span id="receiptCourse"></span></p>
+          <p><strong>Amount:</strong> ₹<span id="receiptAmount"></span></p>
+          <p><strong>Payment Method:</strong> <span id="receiptMethod"></span></p>
+          <p><strong>Transaction ID:</strong> <span id="receiptTxn"></span></p>
+          <p><strong>Date:</strong> <span id="receiptDate"></span></p>
+        </div>
+        <button onclick="downloadReceipt()" style="margin-top:1rem;" class="btn-pay">Download Receipt</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Payment processed by <strong>ingenico</strong> ePayments | <a href="#">Privacy policy</a> | <a href="#">Security</a> | <a href="#">Legal info</a>
+  </footer>
+
+  <script>
+    window.onload = function () {
+      const course = localStorage.getItem("selectedCourse");
+      const price = localStorage.getItem("coursePrice");
+
+      if (course && price) {
+        document.querySelector('.summary h3').textContent = `Order Summary - ${course}`;
+        document.querySelector('.summary .total span').textContent = `₹${price}`;
+        const items = document.querySelectorAll('.summary .item');
+        if (items.length > 0) {
+          items[0].innerHTML = `${course} <span>₹${price}</span>`;
+          if (items[1]) items[1].style.display = 'none';
+        }
+      }
+    };
+
+    function showDetails(method) {
+      const container = document.getElementById('payment-details');
+      container.style.display = 'block';
+
+      let fields = '';
+      if (method === 'card') {
+        fields = `
+          <h4>Enter Card Details</h4>
+          <input type="text" id="card-number" placeholder="Card Number" oninput="validateInput(this, /^\\d{16}$/, 'Card number must be 16 digits')">
+          <div class="error-message" id="card-number-error"></div>
+          <input type="text" id="card-name" placeholder="Name on Card" oninput="validateInput(this, /^.+$/, 'Name is required')">
+          <div class="error-message" id="card-name-error"></div>
+          <input type="text" id="card-expiry" placeholder="Expiry Date (MM/YY)" oninput="validateInput(this, /^(0[1-9]|1[0-2])\\/(\\d{2})$/, 'Invalid expiry format')">
+          <div class="error-message" id="card-expiry-error"></div>
+          <input type="text" id="card-cvv" placeholder="CVV" oninput="validateInput(this, /^\\d{3,4}$/, 'CVV must be 3-4 digits')">
+          <div class="error-message" id="card-cvv-error"></div>
+        `;
+      } else if (method === 'paypal') {
+        fields = `
+          <h4>PayPal Email</h4>
+          <input type="email" id="paypal-email" placeholder="your@email.com" oninput="validateInput(this, /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, 'Invalid email')">
+          <div class="error-message" id="paypal-email-error"></div>
+        `;
+      } else if (method === 'upi') {
+        fields = `
+          <h4>Enter UPI ID</h4>
+          <input type="text" id="upi-id" placeholder="example@upi" oninput="validateInput(this, /^[\\w.-]+@[\\w]+$/, 'Invalid UPI ID')">
+          <div class="error-message" id="upi-id-error"></div>
+        `;
+      }
+      container.innerHTML = fields;
+    }
+
+    function validateInput(input, pattern, errorMsg) {
+      const errorEl = document.getElementById(input.id + '-error');
+      if (!pattern.test(input.value.trim())) {
+        input.classList.add('invalid');
+        errorEl.style.display = 'block';
+        errorEl.textContent = errorMsg;
+      } else {
+        input.classList.remove('invalid');
+        errorEl.style.display = 'none';
+      }
+    }
+
+    function confirmPayment() {
+      const inputs = document.querySelectorAll('#payment-details input');
+      let valid = true;
+      inputs.forEach(input => {
+        input.dispatchEvent(new Event('input'));
+        if (input.classList.contains('invalid') || !input.value.trim()) {
+          valid = false;
+        }
+      });
+
+      if (!valid) {
+        alert('Please correct the highlighted fields.');
+        return;
+      }
+
+      document.querySelector('.btn-pay').style.display = 'none';
+      document.getElementById('confirmationBox').style.display = 'block';
+
+      let methodInput = 'Unknown';
+const inputFields = document.querySelectorAll('#payment-details input');
+if (inputFields.length > 0) {
+  // Try to get the most relevant value (like UPI ID, email, or card number)
+  const firstInput = inputFields[0];
+  const value = firstInput.value.trim();
+  methodInput = value ? value : firstInput.placeholder;
+}
+
+      const course = localStorage.getItem('selectedCourse');
+      const price = localStorage.getItem('coursePrice');
+      const txnId = 'TXN' + Math.floor(Math.random() * 1000000);
+      const date = new Date().toLocaleString();
+
+      document.getElementById('receiptCourse').textContent = course;
+      document.getElementById('receiptAmount').textContent = price;
+      document.getElementById('receiptMethod').textContent = methodInput;
+      document.getElementById('receiptTxn').textContent = txnId;
+      document.getElementById('receiptDate').textContent = date;
+    }
+
+    function downloadReceipt() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      const course = document.getElementById('receiptCourse').textContent;
+      const price = document.getElementById('receiptAmount').textContent;
+      const method = document.getElementById('receiptMethod').textContent;
+      const txn = document.getElementById('receiptTxn').textContent;
+      const date = document.getElementById('receiptDate').textContent;
+
+      doc.text('Payment Receipt', 80, 20);
+      doc.text(`Course: ${course}`, 20, 40);
+      doc.text(`Amount Paid: ₹${price}`, 20, 50);
+      doc.text(`Payment Method: ${method}`, 20, 60);
+      doc.text(`Transaction ID: ${txn}`, 20, 70);
+      doc.text(`Date: ${date}`, 20, 80);
+      doc.text('Thank you for your payment!', 20, 100);
+
+      doc.save(`receipt_${course}.pdf`);
+    }
+  </script>
+
+
+<script>
+  window.onload = function () {
+    const course = localStorage.getItem("selectedCourse");
+    const price = localStorage.getItem("coursePrice");
+
+    if (course && price) {
+      document.querySelector('.summary h3').textContent = `Order Summary - ${course}`;
+      document.querySelector('.summary .total span').textContent = `₹${price}`;
+      const items = document.querySelectorAll('.summary .item');
+      if (items.length > 0) {
+        items[0].innerHTML = `${course} <span>₹${price}</span>`;
+        if (items[1]) items[1].style.display = 'none';
+      }
+    }
+  };
+
+  // ... showDetails() and validateInput() stay the same
+
+  function confirmPayment() {
+    const inputs = document.querySelectorAll('#payment-details input');
+    let valid = true;
+    inputs.forEach(input => {
+      input.dispatchEvent(new Event('input'));
+      if (input.classList.contains('invalid') || !input.value.trim()) {
+        valid = false;
+      }
+    });
+
+    if (!valid) {
+      alert('Please correct the highlighted fields.');
+      return;
+    }
+
+    document.querySelector('.btn-pay').style.display = 'none';
+    document.getElementById('confirmationBox').style.display = 'block';
+
+    const method = document.querySelector('#payment-details input')?.placeholder || 'Unknown';
+    const course = localStorage.getItem('selectedCourse');
+    const price = localStorage.getItem('coursePrice');
+    const txnId = 'TXN' + Math.floor(Math.random() * 1000000);
+    const date = new Date().toLocaleString();
+
+    document.getElementById('receiptCourse').textContent = course;
+    document.getElementById('receiptAmount').textContent = price;
+    document.getElementById('receiptMethod').textContent = method;
+    document.getElementById('receiptTxn').textContent = txnId;
+    document.getElementById('receiptDate').textContent = date;
+  }
+
+  function downloadReceipt() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const course = document.getElementById('receiptCourse').textContent;
+    const price = document.getElementById('receiptAmount').textContent;
+    const method = document.getElementById('receiptMethod').textContent;
+    const txn = document.getElementById('receiptTxn').textContent;
+    const date = document.getElementById('receiptDate').textContent;
+
+    // Elegant styling
+    doc.setFillColor(32, 137, 220);
+    doc.rect(0, 0, 210, 30, 'F');
+    doc.setFontSize(18);
+    doc.setTextColor(255);
+    doc.text('Payment Receipt', 105, 20, { align: 'center' });
+
+    doc.setTextColor(0);
+    doc.setFontSize(12);
+    doc.text(`Course Name:`, 20, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.text(course, 70, 50);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Amount Paid:`, 20, 60);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`₹${price}`, 70, 60);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Payment Method:`, 20, 70);
+    doc.setFont('helvetica', 'bold');
+    doc.text(method, 70, 70);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Transaction ID:`, 20, 80);
+    doc.setFont('helvetica', 'bold');
+    doc.text(txn, 70, 80);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date:`, 20, 90);
+    doc.setFont('helvetica', 'bold');
+    doc.text(date, 70, 90);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Thank you for your purchase!', 105, 120, { align: 'center' });
+
+    doc.save(`receipt_${course}.pdf`);
+  }
+
+  
+</script>
+<script>
+  function goBack() {
+    alert("Payment Cancelled");
+    window.history.back(); // This will take the user to the previous page
+  }
+</script>
+
+</body>
+</html>
+
+</body>
+</html>

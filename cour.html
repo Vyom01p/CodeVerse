@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Course Videos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #f3f6f9;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #026fe0;
+      font-size: 32px;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .videos {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .video-card {
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      position: relative;
+    }
+    .video-title {
+      padding: 12px 15px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      height: 48px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .video-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .thumbnail, .preview {
+      width: 100%;
+      height: 180px;
+      display: block;
+    }
+
+    .thumbnail {
+      object-fit: cover;
+    }
+
+    .preview {
+      display: none;
+      border: none;
+    }
+
+    .video-card:hover .thumbnail {
+      display: none;
+    }
+
+    .video-card:hover .preview {
+      display: block;
+    }
+
+    #loading {
+      text-align: center;
+      margin: 40px 0 20px;
+      font-size: 16px;
+      color: #888;
+    }
+
+    #spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #026fe0;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+      .video-title {
+        font-size: 14px;
+        height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h1 id="course-title">Course</h1>
+<button onclick="window.location.href='courses.html' " style="
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 9999;
+  background-color: #026fe0;
+  border: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 16 16">
+    <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+  </svg>
+</button>
+
+<div class="videos" id="video-container"></div>
+<div id="loading">
+  <div id="spinner"></div>
+  Loading videos...
+</div>
+
+<script>
+  const courseQueryMap = {
+    "html-course": "html tutorial for beginners",
+    "javascript-course": "javascript full course",
+    "sql-course": "sql tutorial for beginners",
+    "chatgpt-course": "chatgpt tutorial",
+    "aws-course": "aws course for beginners",
+    "excel-course": "microsoft excel tutorial",
+    "java-course": "java tutorial for beginners",
+    "c-course": "c programming tutorial"
+  };
+
+  const playlistMap = {
+    "python-programming": "PLGjplNEQ1it8-0CmoljS5yeV-GlKSUEt0",
+    "front-end-development-css": "PLWKjhJtqVAblQe2CCWqV4Zy3LY01Z8aF1",
+    "statistics-for-data-science": "PLfqMhTWNBTe0PY9xunOzsP5kmYIz2Hu7i",
+    "microsoft-azure-essentials": "PLGjplNEQ1it8-0CmoljS5yeV-GlKSUEt0"
+  };
+
+  const courseId = new URLSearchParams(window.location.search).get("course");
+  const searchQuery = courseQueryMap[courseId];
+  let nextPageToken = "";
+  let isLoading = false;
+
+  document.getElementById("course-title").innerText = courseId?.replace(/-/g, " ").toUpperCase() || "COURSE";
+
+  function showPlaylistEmbed(playlistId) {
+    const container = document.getElementById("video-container");
+    container.innerHTML = `
+      <iframe width="100%" height="480"
+        src="https://www.youtube.com/embed/videoseries?list=${playlistId}"
+        title="YouTube video player" frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen>
+      </iframe>
+    `;
+    document.getElementById("loading").style.display = "none";
+  }
+
+  async function loadVideos() {
+    if (!searchQuery || isLoading) return;
+    isLoading = true;
+    document.getElementById("loading").style.display = "block";
+
+    const url = `http://localhost:3000/api/videos?query=${encodeURIComponent(searchQuery)}&pageToken=${nextPageToken}`;
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      const container = document.getElementById("video-container");
+
+      data.items.forEach(item => {
+        const videoId = item.id.videoId;
+        const title = item.snippet.title;
+        const thumbnail = item.snippet.thumbnails.high.url;
+
+        const card = document.createElement("div");
+        card.className = "video-card";
+        card.onclick = () => window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");
+
+        card.innerHTML = `
+          <img class="thumbnail" src="${thumbnail}" alt="${title}">
+          <iframe class="preview" src="https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}" allow="autoplay"></iframe>
+          <div class="video-title" title="${title}">${title}</div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      nextPageToken = data.nextPageToken || "";
+      isLoading = false;
+
+      if (!nextPageToken) {
+        document.getElementById("loading").innerHTML = "🎉 All videos loaded.";
+      }
+    } catch (err) {
+      console.error("Error loading videos:", err);
+      document.getElementById("loading").innerText = "Failed to load videos.";
+    }
+  }
+
+  window.addEventListener("scroll", () => {
+    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100 && nextPageToken) {
+      loadVideos();
+    }
+  });
+
+  const paidCourses = [
+    "python-programming",
+    "statistics-for-data-science",
+    "front-end-development-css",
+    "microsoft-azure-essentials"
+  ];
+
+  const userEmail = localStorage.getItem("userEmail");
+
+  if (paidCourses.includes(courseId)) {
+    fetch("http://localhost:3000/check-access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: userEmail, courseId })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.hasAccess) {
+          if (playlistMap[courseId]) {
+            showPlaylistEmbed(playlistMap[courseId]);
+          } else {
+            loadVideos();
+          }
+        } else {
+          alert("Please purchase this course to access the content.");
+          window.location.href = "courses.html";
+        }
+      })
+      .catch(err => {
+        console.error("Error checking access:", err);
+        alert("Something went wrong. Please try again.");
+        window.location.href = "courses.html";
+      });
+  } else {
+    loadVideos();
+  }
+</script>
+
+</body>
+</html>
